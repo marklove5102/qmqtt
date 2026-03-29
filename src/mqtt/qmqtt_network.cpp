@@ -124,12 +124,12 @@ void QMQTT::Network::initialize()
     _autoReconnectTimer->setSingleShot(true);
     _autoReconnectTimer->setInterval(_autoReconnectInterval);
 
-    QObject::connect(_socket, &SocketInterface::connected, this, &Network::connected);
+    QObject::connect(_socket, &SocketInterface::connected, this, &Network::onConnected);
     QObject::connect(_socket, &SocketInterface::disconnected, this, &Network::onDisconnected);
     QObject::connect(_socket->ioDevice(), &QIODevice::readyRead, this, &Network::onSocketReadReady);
     QObject::connect(
         _autoReconnectTimer, &TimerInterface::timeout,
-        this, static_cast<void (Network::*)()>(&Network::connectToHost));    
+        this, static_cast<void (Network::*)()>(&Network::connectToHost));
     QObject::connect(_socket,
         static_cast<void (SocketInterface::*)(QAbstractSocket::SocketError)>(&SocketInterface::error),
         this, &Network::onSocketError);
@@ -162,7 +162,6 @@ void QMQTT::Network::connectToHost(const QString& hostName, const quint16 port)
 
 void QMQTT::Network::connectToHost()
 {
-    _readState = Header;
     if (_hostName.isEmpty())
     {
         _socket->connectToHost(_host, _port);
@@ -176,10 +175,8 @@ void QMQTT::Network::connectToHost()
 void QMQTT::Network::onSocketError(QAbstractSocket::SocketError socketError)
 {
     emit error(socketError);
-    if(_autoReconnect)
-    {
-        _autoReconnectTimer->start();
-    }
+    // Need call disconnect to protect the state, reconnect will be done when connection is disconnected.
+    disconnectFromHost();
 }
 
 void QMQTT::Network::sendFrame(const Frame& frame)
@@ -266,6 +263,13 @@ void QMQTT::Network::onSocketReadReady()
             break;
         }
     }
+}
+
+void QMQTT::Network::onConnected()
+{
+    emit connected();
+    _readState = Header;
+    _autoReconnectTimer->stop();
 }
 
 void QMQTT::Network::onDisconnected()

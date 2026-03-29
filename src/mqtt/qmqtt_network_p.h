@@ -127,6 +127,7 @@ protected:
 
 protected Q_SLOTS:
     void onSocketReadReady();
+    void onConnected();
     void onDisconnected();
     void connectToHost();
 
